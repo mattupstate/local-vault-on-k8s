@@ -1,0 +1,9 @@
+.DS_Store
+.terraform
+*.tfstate*
+.terraform.lock.hcl
+.task
+.auto.tfvars
+.auto.tfvars.json
+.secrets
+**/charts

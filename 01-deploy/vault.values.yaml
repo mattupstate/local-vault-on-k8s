@@ -1,0 +1,18 @@
+global:
+  tlsDisable: true
+
+server:
+  dataStorage:
+    size: 128Mi
+  volumes:
+    - name: post-start-script
+      configMap:
+        name: vault-post-start-script
+        defaultMode: 0777
+  volumeMounts:
+    - mountPath: /vault/userconfig
+      name: post-start-script
+  postStart:
+    - /bin/sh
+    - -c
+    - /vault/userconfig/vault-post-start.sh

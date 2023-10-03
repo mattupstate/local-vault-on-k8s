@@ -1,0 +1,58 @@
+version: "3"
+
+tasks:
+  vault:deploy-init:
+    internal: true
+    dir: 01-deploy
+    cmds:
+      - terraform init
+    sources:
+      - main.tf
+    generates:
+      - .terraform.lock.hcl
+      - .terraform/**/*
+
+  vault:deploy:
+    desc: Deploys Vault as a service to the local Kubernetes cluster
+    deps:
+      - vault:deploy-init
+    dir: 01-deploy
+    env:
+      KUBE_CTX:
+        sh: kubectl config current-context
+    cmds:
+      - terraform apply -auto-approve
+      - kubectl -n vault wait --for=condition=Ready --timeout=120s pod/vault-0  > /dev/null
+
+  vault:configure-init:
+    internal: true
+    dir: 02-configure
+    cmds:
+      - terraform init
+    sources:
+      - main.tf
+    generates:
+      - .terraform.lock.hcl
+      - .terraform/**/*
+
+  vault:configure:
+    desc: Applies desired configurate state against the Vault service
+    deps:
+      - vault:configure-init
+    dir: 02-configure
+    env:
+      KUBE_CTX:
+        sh: kubectl config current-context
+    cmds:
+      - |
+        kubectl -n vault exec vault-0 -- cat /vault/data/init.json | \
+            jq '{"vault_root_token": .root_token}' > .auto.tfvars.json
+      - kubectl -n vault port-forward service/vault 8200:8200 > /dev/null 2>&1 &
+      - terraform apply -auto-approve
+      - kill $(ps aux | grep 'vault port-forward service/vault' | grep -v 'grep' | awk '{print $2}')
+
+  vault:
+    desc: Deploys and configures Vault
+    cmds:
+      - task: vault:deploy
+      - task: vault:configure
